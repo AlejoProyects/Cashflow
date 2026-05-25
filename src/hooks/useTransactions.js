@@ -3,25 +3,28 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { monthStart, monthEnd, currentMonth } from '../utils/dateHelpers'
 
-export function useTransactions(month = currentMonth()) {
+export function useTransactions({ startDate, endDate } = {}) {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
+
+  const start = startDate ?? monthStart(currentMonth())
+  const end = endDate ?? monthEnd(currentMonth())
 
   const fetch = useCallback(async () => {
     if (!user) return
     setLoading(true)
     const { data } = await supabase
       .from('transactions')
-      .select('*, categories(name, color, icon, type)')
+      .select('*, categories(name, color, icon, type), debts(id, name)')
       .eq('user_id', user.id)
-      .gte('date', monthStart(month))
-      .lte('date', monthEnd(month))
+      .gte('date', start)
+      .lte('date', end)
       .order('date', { ascending: false })
 
     setTransactions(data ?? [])
     setLoading(false)
-  }, [user, month])
+  }, [user, start, end])
 
   useEffect(() => { fetch() }, [fetch])
 

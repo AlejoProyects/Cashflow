@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
+import { CreditCard } from 'lucide-react'
 import { useCategories } from '../../hooks/useCategories'
+import { useDebts } from '../../hooks/useDebts'
+import { formatCurrency } from '../../utils/formatCurrency'
 
 const schema = z.object({
   type: z.enum(['income', 'expense']),
@@ -11,30 +15,78 @@ const schema = z.object({
   date: z.string().min(1, 'Selecciona una fecha'),
   description: z.string().min(1, 'Agrega una descripción'),
   notes: z.string().optional(),
+  debt_id: z.string().optional().nullable(),
 })
 
 export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       type: 'expense',
       date: format(new Date(), 'yyyy-MM-dd'),
+      debt_id: '',
       ...defaultValues,
     },
   })
 
   const type = watch('type')
+  const selectedDebtId = watch('debt_id')
   const { categories } = useCategories(type)
+  const { debts } = useDebts()
+  const activeDebts = debts.filter((d) => d.status === 'active')
+
+  const [isDebtPayment, setIsDebtPayment] = useState(!!(defaultValues?.debt_id))
+
+  const handleDebtToggle = () => {
+    const next = !isDebtPayment
+    setIsDebtPayment(next)
+    if (!next) setValue('debt_id', null)
+  }
+
+  const handleDebtSelect = (e) => {
+    const id = e.target.value || null
+    setValue('debt_id', id)
+    if (id) {
+      const debt = activeDebts.find((d) => d.id === id)
+      if (debt) {
+        setValue('amount', debt.installment_amount)
+        if (!defaultValues?.description) {
+          setValue('description', `Cuota: ${debt.name}`)
+        }
+      }
+    }
+  }
+
+  const handleTypeChange = (e) => {
+    register('type').onChange(e)
+    if (e.target.value === 'income') {
+      setIsDebtPayment(false)
+      setValue('debt_id', null)
+    }
+  }
+
+  const handleSubmitForm = (data) => {
+    onSubmit({
+      ...data,
+      debt_id: isDebtPayment && data.debt_id ? data.debt_id : null,
+    })
+  }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-4">
       {/* Type toggle */}
       <div>
         <label className="label">Tipo</label>
         <div className="grid grid-cols-2 gap-2">
           {['expense', 'income'].map((t) => (
             <label key={t} className="cursor-pointer">
-              <input {...register('type')} type="radio" value={t} className="sr-only" />
+              <input
+                {...register('type')}
+                type="radio"
+                value={t}
+                className="sr-only"
+                onChange={handleTypeChange}
+              />
               <div className={`text-center py-2.5 rounded-xl text-sm font-semibold border transition-all ${
                 type === t
                   ? t === 'expense'
@@ -48,6 +100,46 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
           ))}
         </div>
       </div>
+
+      {/* Debt payment toggle — only for expenses */}
+      {type === 'expense' && activeDebts.length > 0 && (
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <div
+              onClick={handleDebtToggle}
+              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
+                isDebtPayment ? 'bg-primary' : 'bg-bg-elevated border border-white/20'
+              }`}
+            >
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                isDebtPayment ? 'translate-x-5' : 'translate-x-0.5'
+              }`} />
+            </div>
+            <span className="text-txt-secondary text-sm flex items-center gap-1.5">
+              <CreditCard size={13} />
+              Es un pago a deuda
+            </span>
+          </label>
+
+          {isDebtPayment && (
+            <div>
+              <label className="label">Deuda asociada</label>
+              <select
+                value={selectedDebtId || ''}
+                onChange={handleDebtSelect}
+                className="input"
+              >
+                <option value="">Seleccionar deuda...</option>
+                {activeDebts.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} — cuota {formatCurrency(d.installment_amount)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div>

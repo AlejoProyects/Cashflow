@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { TrendingUp, TrendingDown, Wallet, CreditCard, Calendar, Target } from 'lucide-react'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts'
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns'
 import { useAuth } from '../../hooks/useAuth'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useDebts } from '../../hooks/useDebts'
@@ -11,7 +13,44 @@ import StatCard from '../../components/ui/StatCard'
 import ProgressBar from '../../components/ui/ProgressBar'
 import Spinner from '../../components/ui/Spinner'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { currentMonthLabel, formatDate, daysUntil } from '../../utils/dateHelpers'
+import { formatDate, daysUntil } from '../../utils/dateHelpers'
+
+const fmt = (d) => format(d, 'yyyy-MM-dd')
+const fmtLabel = (d) => format(d, 'dd/MM/yyyy')
+
+const PRESETS = [
+  {
+    id: 'mes',
+    label: 'Este mes',
+    start: () => fmt(startOfMonth(new Date())),
+    end: () => fmt(endOfMonth(new Date())),
+  },
+  {
+    id: 'anterior',
+    label: 'Mes anterior',
+    start: () => fmt(startOfMonth(subMonths(new Date(), 1))),
+    end: () => fmt(endOfMonth(subMonths(new Date(), 1))),
+  },
+  {
+    id: '3m',
+    label: '3 meses',
+    start: () => fmt(startOfMonth(subMonths(new Date(), 2))),
+    end: () => fmt(endOfMonth(new Date())),
+  },
+  {
+    id: '6m',
+    label: '6 meses',
+    start: () => fmt(startOfMonth(subMonths(new Date(), 5))),
+    end: () => fmt(endOfMonth(new Date())),
+  },
+  {
+    id: 'año',
+    label: 'Este año',
+    start: () => fmt(startOfYear(new Date())),
+    end: () => fmt(endOfYear(new Date())),
+  },
+  { id: 'custom', label: 'Personalizado' },
+]
 
 const TOOLTIP_STYLE = {
   backgroundColor: 'rgb(var(--bg-elevated))',
@@ -23,7 +62,25 @@ const TOOLTIP_STYLE = {
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { transactions, totals, loading: loadTx } = useTransactions()
+
+  const [activePreset, setActivePreset] = useState('mes')
+  const [range, setRange] = useState({
+    startDate: PRESETS[0].start(),
+    endDate: PRESETS[0].end(),
+  })
+
+  const handlePreset = (preset) => {
+    setActivePreset(preset.id)
+    if (preset.id !== 'custom') {
+      setRange({ startDate: preset.start(), endDate: preset.end() })
+    }
+  }
+
+  const rangeLabel = activePreset === 'custom'
+    ? `${fmtLabel(new Date(range.startDate + 'T00:00:00'))} → ${fmtLabel(new Date(range.endDate + 'T00:00:00'))}`
+    : PRESETS.find((p) => p.id === activePreset)?.label
+
+  const { transactions, totals, loading: loadTx } = useTransactions(range)
   const { debts, totals: debtTotals, loading: loadDebts } = useDebts()
   const { payments, loading: loadPay } = useFixedPayments()
   const { goals, loading: loadGoals } = useGoals()
@@ -67,13 +124,51 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-txt-primary">
           Hola, <span className="text-gradient">{firstName}</span> 👋
         </h1>
-        <p className="text-txt-muted text-sm mt-0.5 capitalize">{currentMonthLabel()}</p>
+        <p className="text-txt-muted text-sm mt-0.5">{rangeLabel}</p>
+      </div>
+
+      {/* Date range selector */}
+      <div className="space-y-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handlePreset(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+                activePreset === p.id
+                  ? 'gradient-primary text-white'
+                  : 'bg-bg-elevated text-txt-secondary hover:text-txt-primary border border-white/10'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {activePreset === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={range.startDate}
+              max={range.endDate}
+              onChange={(e) => setRange((r) => ({ ...r, startDate: e.target.value }))}
+              className="input flex-1 text-xs py-1.5"
+            />
+            <span className="text-txt-muted text-xs shrink-0">→</span>
+            <input
+              type="date"
+              value={range.endDate}
+              min={range.startDate}
+              onChange={(e) => setRange((r) => ({ ...r, endDate: e.target.value }))}
+              className="input flex-1 text-xs py-1.5"
+            />
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          title="Balance del mes"
+          title="Balance del período"
           value={formatCurrency(totals.balance)}
           icon={Wallet}
           gradient={totals.balance >= 0 ? 'gradient-primary' : 'gradient-danger'}

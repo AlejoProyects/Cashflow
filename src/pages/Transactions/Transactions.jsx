@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Plus, Trash2, Pencil, ArrowLeftRight, TrendingUp, TrendingDown, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Pencil, ArrowLeftRight, ChevronDown, CreditCard } from 'lucide-react'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useCategories } from '../../hooks/useCategories'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { formatDateShort, currentMonth } from '../../utils/dateHelpers'
+import { formatDateShort, currentMonth, monthStart, monthEnd } from '../../utils/dateHelpers'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
@@ -12,7 +12,10 @@ import TransactionForm from './TransactionForm'
 
 export default function Transactions() {
   const [month] = useState(currentMonth())
-  const { transactions, loading, add, update, remove, totals } = useTransactions(month)
+  const { transactions, loading, add, update, remove, totals } = useTransactions({
+    startDate: monthStart(month),
+    endDate: monthEnd(month),
+  })
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [filter, setFilter] = useState('all')
@@ -143,6 +146,12 @@ export default function Transactions() {
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <Badge variant="muted">{t.categories?.name || '—'}</Badge>
                     <span className="text-txt-muted text-xs">{formatDateShort(t.date)}</span>
+                    {t.debts?.name && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-primary-light bg-primary/10 px-1.5 py-0.5 rounded-md">
+                        <CreditCard size={9} />
+                        {t.debts.name}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-0.5 shrink-0">
@@ -179,7 +188,15 @@ export default function Transactions() {
                       </div>
                     </td>
                     <td className="px-3 py-3.5">
-                      <Badge variant="muted">{t.categories?.name || '—'}</Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="muted">{t.categories?.name || '—'}</Badge>
+                        {t.debts?.name && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-primary-light bg-primary/10 px-1.5 py-0.5 rounded-md w-fit">
+                            <CreditCard size={9} />
+                            {t.debts.name}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3.5 text-txt-muted hidden md:table-cell">{formatDateShort(t.date)}</td>
                     <td className="px-5 py-3.5 text-right">
@@ -220,6 +237,7 @@ export default function Transactions() {
             date: editing.date,
             description: editing.description,
             notes: editing.notes || '',
+            debt_id: editing.debt_id || '',
           } : undefined}
         />
       </Modal>

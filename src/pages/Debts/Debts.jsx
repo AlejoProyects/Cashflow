@@ -385,39 +385,39 @@ export default function Debts() {
             return (
               <div key={d.id} className="card">
                 {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 min-w-0 mr-3">
-                    <p className="text-txt-primary font-semibold text-base truncate">{d.name}</p>
-                    <p className="text-txt-muted text-xs mt-0.5">
-                      {formatCurrency(d.installment_amount)} × {d.total_installments} cuotas
-                      {' '}= <span className="text-txt-secondary">{formatCurrency(d.total_amount)}</span>
-                    </p>
-                    {d.notes && (
-                      <p className="text-txt-muted text-xs mt-1 italic">{d.notes}</p>
-                    )}
+                <div className="mb-3">
+                  <div className="flex items-start justify-between">
+                    <p className="text-txt-primary font-semibold text-base leading-snug flex-1">{d.name}</p>
+                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                      <button
+                        onClick={() => setEditDebt(d)}
+                        className="p-1.5 rounded-lg text-txt-muted hover:text-primary-light hover:bg-primary/10 transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`¿Eliminar "${d.name}"?`)) remove(d.id) }}
+                        className="p-1.5 rounded-lg text-txt-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => setPayDebt(d)}
-                      disabled={remaining === 0}
-                      className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
-                    >
-                      <Layers size={12} />
-                      Pagar cuota
-                    </button>
-                    <button
-                      onClick={() => setEditDebt(d)}
-                      className="p-1.5 rounded-lg text-txt-muted hover:text-primary-light hover:bg-primary/10 transition-colors"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => { if (confirm(`¿Eliminar "${d.name}"?`)) remove(d.id) }}
-                      className="p-1.5 rounded-lg text-txt-muted hover:text-danger hover:bg-danger/10 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                  <p className="text-txt-muted text-xs mt-0.5">
+                    {formatCurrency(d.installment_amount)} × {d.total_installments} cuotas
+                    {' '}= <span className="text-txt-secondary">{formatCurrency(d.total_amount)}</span>
+                  </p>
+                  {d.notes && (
+                    <p className="text-txt-muted text-xs mt-1 italic">{d.notes}</p>
+                  )}
+                  <button
+                    onClick={() => setPayDebt(d)}
+                    disabled={remaining === 0}
+                    className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5 mt-3 w-full sm:w-auto justify-center"
+                  >
+                    <Layers size={12} />
+                    Pagar cuota
+                  </button>
                 </div>
 
                 {/* Progress */}
@@ -429,7 +429,7 @@ export default function Debts() {
                     <span className="text-txt-muted">{Math.round(paidPct)}%</span>
                   </div>
                   <ProgressBar value={d.paid_installments} max={d.total_installments} colorClass="gradient-primary" />
-                  <div className="flex justify-between text-xs mt-1">
+                  <div className="flex flex-col text-xs mt-1 gap-0.5">
                     <span className="text-success font-medium">
                       Pagado: {formatCurrency(d.paid_amount)}
                     </span>

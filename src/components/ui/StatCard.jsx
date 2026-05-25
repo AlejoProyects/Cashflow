@@ -6,15 +6,15 @@ export default function StatCard({ title, value, subtitle, icon: Icon, gradient,
 
   return (
     <div className="stat-card group hover:border-white/10 transition-all duration-200">
-      <div className="flex items-start justify-between mb-4">
-        <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="min-w-0 flex-1 mr-4">
           <p className="label">{title}</p>
           <p className="text-2xl font-bold text-txt-primary mt-1">{value}</p>
           {subtitle && <p className="text-txt-muted text-xs mt-1">{subtitle}</p>}
         </div>
         {Icon && (
-          <div className={`w-11 h-11 rounded-xl ${gradient} flex items-center justify-center shadow-lg flex-shrink-0`}>
-            <Icon size={20} className="text-white" />
+          <div className={`w-12 h-12 rounded-xl ${gradient} flex items-center justify-center shadow-lg flex-shrink-0`}>
+            <Icon size={22} className="text-white" />
           </div>
         )}
       </div>
