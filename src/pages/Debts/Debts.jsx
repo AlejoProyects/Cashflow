@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, CreditCard, CheckCircle, Layers } from 'lucide-react'
+import { Plus, Trash2, CreditCard, CheckCircle, Layers, Pencil } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -21,15 +21,27 @@ const debtSchema = z.object({
   notes: z.string().optional(),
 })
 
-function DebtForm({ onSubmit, onCancel }) {
+function DebtForm({ onSubmit, onCancel, debt = null }) {
+  const isEdit = !!debt
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(debtSchema),
-    defaultValues: {
-      has_previous: false,
-      paid_by_value: false,
-      paid_installments: 0,
-      previous_value: 0,
-    },
+    defaultValues: isEdit
+      ? {
+          name: debt.name,
+          installment_amount: debt.installment_amount,
+          total_installments: debt.total_installments,
+          paid_installments: debt.paid_installments,
+          notes: debt.notes || '',
+          has_previous: false,
+          paid_by_value: false,
+          previous_value: 0,
+        }
+      : {
+          has_previous: false,
+          paid_by_value: false,
+          paid_installments: 0,
+          previous_value: 0,
+        },
   })
 
   const hasPrevious = watch('has_previous')
@@ -42,15 +54,20 @@ function DebtForm({ onSubmit, onCancel }) {
     : null
 
   const handleSubmitForm = (data) => {
-    let paidInstallments = 0
-    if (data.has_previous) {
-      if (data.paid_by_value && Number(data.previous_value) > 0 && Number(data.installment_amount) > 0) {
-        paidInstallments = Math.floor(Number(data.previous_value) / Number(data.installment_amount))
-      } else {
-        paidInstallments = Number(data.paid_installments) || 0
+    let paidInstallments
+    if (isEdit) {
+      paidInstallments = Math.min(Number(data.paid_installments) || 0, Number(data.total_installments))
+    } else {
+      paidInstallments = 0
+      if (data.has_previous) {
+        if (data.paid_by_value && Number(data.previous_value) > 0 && Number(data.installment_amount) > 0) {
+          paidInstallments = Math.floor(Number(data.previous_value) / Number(data.installment_amount))
+        } else {
+          paidInstallments = Number(data.paid_installments) || 0
+        }
       }
+      paidInstallments = Math.min(paidInstallments, Number(data.total_installments))
     }
-    paidInstallments = Math.min(paidInstallments, Number(data.total_installments))
     onSubmit({
       name: data.name,
       installment_amount: data.installment_amount,
@@ -95,80 +112,99 @@ function DebtForm({ onSubmit, onCancel }) {
         </div>
       )}
 
-      {/* Previous payments toggle */}
-      <div>
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <div
-            onClick={() => setValue('has_previous', !hasPrevious)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
-              hasPrevious ? 'bg-primary' : 'bg-bg-elevated border border-white/20'
-            }`}
-          >
-            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              hasPrevious ? 'translate-x-5' : 'translate-x-0.5'
-            }`} />
-          </div>
-          <span className="text-txt-secondary text-sm">¿Ya has realizado pagos anteriores?</span>
-        </label>
-      </div>
+      {/* Edit mode: show paid_installments directly */}
+      {isEdit && (
+        <div>
+          <label className="label">Cuotas pagadas</label>
+          <input
+            {...register('paid_installments')}
+            type="number"
+            min="0"
+            max={watch('total_installments')}
+            className="input"
+          />
+          {errors.paid_installments && (
+            <p className="text-danger text-xs mt-1">{errors.paid_installments.message}</p>
+          )}
+        </div>
+      )}
 
-      {/* Previous payment fields */}
-      {hasPrevious && (
-        <div className="bg-bg-elevated rounded-xl p-4 space-y-3 border border-white/5">
-          {/* Sub-toggle: by installments or by value */}
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              [false, 'Por cuotas'],
-              [true, 'Por valor'],
-            ].map(([val, lbl]) => (
-              <button
-                key={String(val)}
-                type="button"
-                onClick={() => setValue('paid_by_value', val)}
-                className={`py-2 rounded-lg text-xs font-semibold border transition-all ${
-                  paidByValue === val
-                    ? 'gradient-primary text-white border-transparent'
-                    : 'border-white/10 text-txt-secondary hover:border-white/20'
+      {/* Previous payments section (create mode only) */}
+      {!isEdit && (
+        <>
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <div
+                onClick={() => setValue('has_previous', !hasPrevious)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${
+                  hasPrevious ? 'bg-primary' : 'bg-bg-elevated border border-white/20'
                 }`}
               >
-                {lbl}
-              </button>
-            ))}
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  hasPrevious ? 'translate-x-5' : 'translate-x-0.5'
+                }`} />
+              </div>
+              <span className="text-txt-secondary text-sm">¿Ya has realizado pagos anteriores?</span>
+            </label>
           </div>
 
-          {paidByValue ? (
-            <div>
-              <label className="label">Valor ya pagado</label>
-              <input
-                {...register('previous_value')}
-                type="number"
-                placeholder="0"
-                className="input"
-              />
-              {Number(installmentAmount) > 0 && Number(watch('previous_value')) > 0 && (
-                <p className="text-txt-muted text-xs mt-1">
-                  ≈ {Math.floor(Number(watch('previous_value')) / Number(installmentAmount))} cuotas
-                </p>
-              )}
-            </div>
-          ) : (
-            <div>
-              <label className="label">Cuotas ya pagadas</label>
-              <input
-                {...register('paid_installments')}
-                type="number"
-                min="0"
-                placeholder="0"
-                className="input"
-              />
-              {Number(watch('paid_installments')) > 0 && Number(installmentAmount) > 0 && (
-                <p className="text-txt-muted text-xs mt-1">
-                  = {formatCurrency(Number(watch('paid_installments')) * Number(installmentAmount))} pagados
-                </p>
+          {hasPrevious && (
+            <div className="bg-bg-elevated rounded-xl p-4 space-y-3 border border-white/5">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  [false, 'Por cuotas'],
+                  [true, 'Por valor'],
+                ].map(([val, lbl]) => (
+                  <button
+                    key={String(val)}
+                    type="button"
+                    onClick={() => setValue('paid_by_value', val)}
+                    className={`py-2 rounded-lg text-xs font-semibold border transition-all ${
+                      paidByValue === val
+                        ? 'gradient-primary text-white border-transparent'
+                        : 'border-white/10 text-txt-secondary hover:border-white/20'
+                    }`}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+
+              {paidByValue ? (
+                <div>
+                  <label className="label">Valor ya pagado</label>
+                  <input
+                    {...register('previous_value')}
+                    type="number"
+                    placeholder="0"
+                    className="input"
+                  />
+                  {Number(installmentAmount) > 0 && Number(watch('previous_value')) > 0 && (
+                    <p className="text-txt-muted text-xs mt-1">
+                      ≈ {Math.floor(Number(watch('previous_value')) / Number(installmentAmount))} cuotas
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="label">Cuotas ya pagadas</label>
+                  <input
+                    {...register('paid_installments')}
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    className="input"
+                  />
+                  {Number(watch('paid_installments')) > 0 && Number(installmentAmount) > 0 && (
+                    <p className="text-txt-muted text-xs mt-1">
+                      = {formatCurrency(Number(watch('paid_installments')) * Number(installmentAmount))} pagados
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Notes */}
@@ -180,7 +216,7 @@ function DebtForm({ onSubmit, onCancel }) {
       <div className="flex gap-2 pt-2">
         <button type="button" onClick={onCancel} className="btn-secondary flex-1">Cancelar</button>
         <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
-          {isSubmitting ? 'Guardando...' : 'Guardar deuda'}
+          {isSubmitting ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Guardar deuda'}
         </button>
       </div>
     </form>
@@ -261,9 +297,10 @@ function PayModal({ debt, onConfirm, onClose }) {
 }
 
 export default function Debts() {
-  const { debts, loading, add, payInstallments, remove, totals } = useDebts()
+  const { debts, loading, add, update, payInstallments, remove, totals } = useDebts()
   const [addOpen, setAddOpen] = useState(false)
   const [payDebt, setPayDebt] = useState(null)
+  const [editDebt, setEditDebt] = useState(null)
 
   const active = debts.filter((d) => d.status === 'active')
   const paid = debts.filter((d) => d.status === 'paid')
@@ -276,6 +313,23 @@ export default function Debts() {
   const handlePayment = async (count) => {
     await payInstallments(payDebt.id, count)
     setPayDebt(null)
+  }
+
+  const handleEdit = async ({ name, installment_amount, total_installments, paid_installments, notes }) => {
+    const totalAmt = Number(installment_amount) * Number(total_installments)
+    const paidAmt = Number(installment_amount) * Number(paid_installments)
+    const status = Number(paid_installments) >= Number(total_installments) ? 'paid' : 'active'
+    await update(editDebt.id, {
+      name,
+      installment_amount: Number(installment_amount),
+      total_installments: Number(total_installments),
+      paid_installments: Number(paid_installments),
+      total_amount: totalAmt,
+      paid_amount: paidAmt,
+      status,
+      notes: notes || null,
+    })
+    setEditDebt(null)
   }
 
   return (
@@ -352,6 +406,12 @@ export default function Debts() {
                       Pagar cuota
                     </button>
                     <button
+                      onClick={() => setEditDebt(d)}
+                      className="p-1.5 rounded-lg text-txt-muted hover:text-primary-light hover:bg-primary/10 transition-colors"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
                       onClick={() => { if (confirm(`¿Eliminar "${d.name}"?`)) remove(d.id) }}
                       className="p-1.5 rounded-lg text-txt-muted hover:text-danger hover:bg-danger/10 transition-colors"
                     >
@@ -420,6 +480,12 @@ export default function Debts() {
       >
         {payDebt && (
           <PayModal debt={payDebt} onConfirm={handlePayment} onClose={() => setPayDebt(null)} />
+        )}
+      </Modal>
+
+      <Modal isOpen={!!editDebt} onClose={() => setEditDebt(null)} title="Editar deuda">
+        {editDebt && (
+          <DebtForm debt={editDebt} onSubmit={handleEdit} onCancel={() => setEditDebt(null)} />
         )}
       </Modal>
     </div>
