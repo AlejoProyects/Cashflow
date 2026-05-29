@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Check, Trash2, Calendar } from 'lucide-react'
+import { Plus, Check, Trash2, Calendar, RotateCcw } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -67,7 +67,7 @@ function AddForm({ onSubmit, onCancel }) {
 }
 
 export default function FixedPayments() {
-  const { payments, loading, add, togglePaid, remove, ensureMonthExists } = useFixedPayments()
+  const { payments, loading, add, togglePaid, remove, resetMonth, ensureMonthExists } = useFixedPayments()
   const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => { ensureMonthExists() }, [])
@@ -89,9 +89,20 @@ export default function FixedPayments() {
           <h1 className="text-2xl font-bold text-txt-primary">Pagos Fijos</h1>
           <p className="text-txt-muted text-sm mt-0.5 capitalize">{currentMonthLabel()}</p>
         </div>
-        <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /><span className="hidden sm:inline">Agregar</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {paid.length > 0 && (
+            <button
+              onClick={() => { if (confirm('¿Reiniciar todos los pagos del mes a pendiente?')) resetMonth() }}
+              className="btn-secondary flex items-center gap-1.5 text-sm"
+            >
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline">Reiniciar mes</span>
+            </button>
+          )}
+          <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /><span className="hidden sm:inline">Agregar</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary */}

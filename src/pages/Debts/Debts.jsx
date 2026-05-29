@@ -324,7 +324,13 @@ export default function Debts() {
     setLoadingHistoryId(null)
   }
 
-  const active = debts.filter((d) => d.status === 'active')
+  const active = debts
+    .filter((d) => d.status === 'active')
+    .sort((a, b) => {
+      const remA = (Number(a.total_installments) - Number(a.paid_installments)) * Number(a.installment_amount)
+      const remB = (Number(b.total_installments) - Number(b.paid_installments)) * Number(b.installment_amount)
+      return remA - remB
+    })
   const paid = debts.filter((d) => d.status === 'paid')
 
   const handleAdd = async (data) => {

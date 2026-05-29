@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, Wallet, CreditCard, Calendar, Target } from '
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts'
-import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns'
+import { format, startOfMonth, endOfMonth, subDays, startOfYear, endOfYear } from 'date-fns'
 import { useAuth } from '../../hooks/useAuth'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useDebts } from '../../hooks/useDebts'
@@ -20,35 +20,13 @@ const fmtLabel = (d) => format(d, 'dd/MM/yyyy')
 
 const PRESETS = [
   {
-    id: 'mes',
-    label: 'Este mes',
-    start: () => fmt(startOfMonth(new Date())),
-    end: () => fmt(endOfMonth(new Date())),
+    id: '30d',
+    label: 'Últimos 30 días',
+    start: () => fmt(subDays(new Date(), 29)),
+    end: () => fmt(new Date()),
   },
-  {
-    id: 'anterior',
-    label: 'Mes anterior',
-    start: () => fmt(startOfMonth(subMonths(new Date(), 1))),
-    end: () => fmt(endOfMonth(subMonths(new Date(), 1))),
-  },
-  {
-    id: '3m',
-    label: '3 meses',
-    start: () => fmt(startOfMonth(subMonths(new Date(), 2))),
-    end: () => fmt(endOfMonth(new Date())),
-  },
-  {
-    id: '6m',
-    label: '6 meses',
-    start: () => fmt(startOfMonth(subMonths(new Date(), 5))),
-    end: () => fmt(endOfMonth(new Date())),
-  },
-  {
-    id: 'año',
-    label: 'Este año',
-    start: () => fmt(startOfYear(new Date())),
-    end: () => fmt(endOfYear(new Date())),
-  },
+  { id: 'mes', label: 'Por mes' },
+  { id: 'año', label: 'Por año' },
   { id: 'custom', label: 'Personalizado' },
 ]
 
@@ -63,22 +41,48 @@ const TOOLTIP_STYLE = {
 export default function Dashboard() {
   const { user } = useAuth()
 
-  const [activePreset, setActivePreset] = useState('mes')
+  const [activePreset, setActivePreset] = useState('30d')
   const [range, setRange] = useState({
-    startDate: PRESETS[0].start(),
-    endDate: PRESETS[0].end(),
+    startDate: fmt(subDays(new Date(), 29)),
+    endDate: fmt(new Date()),
   })
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'))
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
 
   const handlePreset = (preset) => {
     setActivePreset(preset.id)
-    if (preset.id !== 'custom') {
-      setRange({ startDate: preset.start(), endDate: preset.end() })
+    if (preset.id === '30d') {
+      setRange({ startDate: fmt(subDays(new Date(), 29)), endDate: fmt(new Date()) })
+    } else if (preset.id === 'mes') {
+      const [y, m] = selectedMonth.split('-').map(Number)
+      const d = new Date(y, m - 1, 1)
+      setRange({ startDate: fmt(startOfMonth(d)), endDate: fmt(endOfMonth(d)) })
+    } else if (preset.id === 'año') {
+      const d = new Date(parseInt(selectedYear), 0, 1)
+      setRange({ startDate: fmt(startOfYear(d)), endDate: fmt(endOfYear(d)) })
     }
   }
 
-  const rangeLabel = activePreset === 'custom'
-    ? `${fmtLabel(new Date(range.startDate + 'T00:00:00'))} → ${fmtLabel(new Date(range.endDate + 'T00:00:00'))}`
-    : PRESETS.find((p) => p.id === activePreset)?.label
+  const handleMonthChange = (val) => {
+    setSelectedMonth(val)
+    const [y, m] = val.split('-').map(Number)
+    const d = new Date(y, m - 1, 1)
+    setRange({ startDate: fmt(startOfMonth(d)), endDate: fmt(endOfMonth(d)) })
+  }
+
+  const handleYearChange = (val) => {
+    setSelectedYear(val)
+    const d = new Date(parseInt(val), 0, 1)
+    setRange({ startDate: fmt(startOfYear(d)), endDate: fmt(endOfYear(d)) })
+  }
+
+  const rangeLabel = (() => {
+    if (activePreset === 'custom' || activePreset === 'mes') {
+      return `${fmtLabel(new Date(range.startDate + 'T00:00:00'))} → ${fmtLabel(new Date(range.endDate + 'T00:00:00'))}`
+    }
+    if (activePreset === 'año') return `Año ${selectedYear}`
+    return PRESETS.find((p) => p.id === activePreset)?.label
+  })()
 
   const { transactions, totals, loading: loadTx } = useTransactions(range)
   const { debts, totals: debtTotals, loading: loadDebts } = useDebts()
@@ -105,7 +109,13 @@ export default function Dashboard() {
     .slice(0, 5)
 
   const activeGoals = goals.filter((g) => g.status === 'active').slice(0, 3)
-  const activeDebts = debts.filter((d) => d.status === 'active').slice(0, 3)
+  const activeDebts = debts
+    .filter((d) => d.status === 'active')
+    .sort((a, b) => {
+      const pctA = Number(a.total_amount) > 0 ? Number(a.paid_amount) / Number(a.total_amount) : 0
+      const pctB = Number(b.total_amount) > 0 ? Number(b.paid_amount) / Number(b.total_amount) : 0
+      return pctB - pctA
+    })
 
   const loading = loadTx || loadDebts || loadPay || loadGoals
 
@@ -144,6 +154,25 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
+        {activePreset === 'mes' && (
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            className="input text-xs py-1.5 w-44"
+          />
+        )}
+        {activePreset === 'año' && (
+          <select
+            value={selectedYear}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className="input text-xs py-1.5 w-32"
+          >
+            {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+              <option key={y} value={String(y)}>{y}</option>
+            ))}
+          </select>
+        )}
         {activePreset === 'custom' && (
           <div className="flex items-center gap-2">
             <input

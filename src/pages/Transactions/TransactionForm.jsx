@@ -3,9 +3,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
-import { CreditCard } from 'lucide-react'
+import { CreditCard, Receipt } from 'lucide-react'
 import { useCategories } from '../../hooks/useCategories'
 import { useDebts } from '../../hooks/useDebts'
+import { useFixedPayments } from '../../hooks/useFixedPayments'
 import { formatCurrency } from '../../utils/formatCurrency'
 
 const schema = z.object({
@@ -16,6 +17,7 @@ const schema = z.object({
   description: z.string().min(1, 'Agrega una descripción'),
   notes: z.string().optional(),
   debt_id: z.string().optional().nullable(),
+  fixed_payment_id: z.string().optional().nullable(),
 })
 
 export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
@@ -25,22 +27,55 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
       type: 'expense',
       date: format(new Date(), 'yyyy-MM-dd'),
       debt_id: '',
+      fixed_payment_id: '',
       ...defaultValues,
     },
   })
 
   const type = watch('type')
   const selectedDebtId = watch('debt_id')
+  const selectedFixedPaymentId = watch('fixed_payment_id')
   const { categories } = useCategories(type)
   const { debts } = useDebts()
   const activeDebts = debts.filter((d) => d.status === 'active')
+  const { payments: fixedPayments } = useFixedPayments()
 
   const [isDebtPayment, setIsDebtPayment] = useState(!!(defaultValues?.debt_id))
+  const [isFixedPayment, setIsFixedPayment] = useState(!!(defaultValues?.fixed_payment_id))
 
   const handleDebtToggle = () => {
     const next = !isDebtPayment
     setIsDebtPayment(next)
-    if (!next) setValue('debt_id', null)
+    if (next) {
+      setIsFixedPayment(false)
+      setValue('fixed_payment_id', null)
+    } else {
+      setValue('debt_id', null)
+    }
+  }
+
+  const handleFixedPaymentToggle = () => {
+    const next = !isFixedPayment
+    setIsFixedPayment(next)
+    if (next) {
+      setIsDebtPayment(false)
+      setValue('debt_id', null)
+    } else {
+      setValue('fixed_payment_id', null)
+    }
+  }
+
+  const handleFixedPaymentSelect = (e) => {
+    const id = e.target.value || null
+    setValue('fixed_payment_id', id)
+    if (id) {
+      const payment = fixedPayments.find((p) => p.id === id)
+      if (payment) {
+        setValue('amount', payment.amount)
+        if (!defaultValues?.description) setValue('description', payment.name)
+        if (payment.category_id) setValue('category_id', payment.category_id)
+      }
+    }
   }
 
   const handleDebtSelect = (e) => {
@@ -62,6 +97,8 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
     if (e.target.value === 'income') {
       setIsDebtPayment(false)
       setValue('debt_id', null)
+      setIsFixedPayment(false)
+      setValue('fixed_payment_id', null)
     }
   }
 
@@ -69,8 +106,15 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
     await onSubmit({
       ...data,
       debt_id: isDebtPayment && data.debt_id ? data.debt_id : null,
+      fixed_payment_id: isFixedPayment && data.fixed_payment_id ? data.fixed_payment_id : null,
     })
   }
+
+  const pendingPayments = fixedPayments.filter((p) => p.status === 'pending')
+  const selectedPayment = selectedFixedPaymentId ? fixedPayments.find((p) => p.id === selectedFixedPaymentId) : null
+  const dropdownPayments = selectedPayment && selectedPayment.status !== 'pending'
+    ? [...pendingPayments, selectedPayment]
+    : pendingPayments
 
   return (
     <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-4">
@@ -101,25 +145,42 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
         </div>
       </div>
 
-      {/* Debt payment toggle — only for expenses */}
-      {type === 'expense' && activeDebts.length > 0 && (
+      {/* Link to debt or fixed payment — only for expenses */}
+      {type === 'expense' && (activeDebts.length > 0 || fixedPayments.length > 0) && (
         <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <div
-              onClick={handleDebtToggle}
-              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
-                isDebtPayment ? 'bg-primary' : 'bg-bg-elevated border border-white/20'
-              }`}
-            >
-              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                isDebtPayment ? 'translate-x-5' : 'translate-x-0.5'
-              }`} />
+          <div>
+            <label className="label">Vincular a</label>
+            <div className="flex gap-2">
+              {activeDebts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDebtToggle}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                    isDebtPayment
+                      ? 'gradient-primary text-white border-transparent'
+                      : 'border-white/10 text-txt-secondary hover:border-white/20'
+                  }`}
+                >
+                  <CreditCard size={14} />
+                  Deuda
+                </button>
+              )}
+              {fixedPayments.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleFixedPaymentToggle}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                    isFixedPayment
+                      ? 'gradient-primary text-white border-transparent'
+                      : 'border-white/10 text-txt-secondary hover:border-white/20'
+                  }`}
+                >
+                  <Receipt size={14} />
+                  Pago fijo
+                </button>
+              )}
             </div>
-            <span className="text-txt-secondary text-sm flex items-center gap-1.5">
-              <CreditCard size={13} />
-              Es un pago a deuda
-            </span>
-          </label>
+          </div>
 
           {isDebtPayment && (
             <div>
@@ -133,6 +194,24 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
                 {activeDebts.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name} — cuota {formatCurrency(d.installment_amount)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {isFixedPayment && (
+            <div>
+              <label className="label">Pago fijo asociado</label>
+              <select
+                value={selectedFixedPaymentId || ''}
+                onChange={handleFixedPaymentSelect}
+                className="input"
+              >
+                <option value="">Seleccionar pago fijo...</option>
+                {dropdownPayments.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {formatCurrency(p.amount)}
                   </option>
                 ))}
               </select>

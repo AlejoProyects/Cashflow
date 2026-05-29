@@ -1,21 +1,64 @@
 import { useState } from 'react'
-import { Plus, Trash2, Pencil, ArrowLeftRight, ChevronDown, CreditCard } from 'lucide-react'
+import { Plus, Trash2, Pencil, ArrowLeftRight, ChevronDown, CreditCard, Receipt } from 'lucide-react'
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays } from 'date-fns'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useCategories } from '../../hooks/useCategories'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { formatDateShort, currentMonth, monthStart, monthEnd } from '../../utils/dateHelpers'
+import { formatDateShort } from '../../utils/dateHelpers'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
 import Spinner from '../../components/ui/Spinner'
 import TransactionForm from './TransactionForm'
 
+const fmt = (d) => format(d, 'yyyy-MM-dd')
+
+const PRESETS = [
+  { id: 'todo', label: 'Todo' },
+  { id: '30d', label: 'Últimos 30 días' },
+  { id: 'mes', label: 'Por mes' },
+  { id: 'año', label: 'Por año' },
+  { id: 'custom', label: 'Personalizado' },
+]
+
 export default function Transactions() {
-  const [month] = useState(currentMonth())
-  const { transactions, loading, add, update, remove, totals } = useTransactions({
-    startDate: monthStart(month),
-    endDate: monthEnd(month),
-  })
+  const [activePreset, setActivePreset] = useState('todo')
+  const [range, setRange] = useState({})
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'))
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
+
+  const handlePreset = (id) => {
+    setActivePreset(id)
+    if (id === 'todo') {
+      setRange({})
+    } else if (id === '30d') {
+      setRange({ startDate: fmt(subDays(new Date(), 29)), endDate: fmt(new Date()) })
+    } else if (id === 'mes') {
+      const [y, m] = selectedMonth.split('-').map(Number)
+      const d = new Date(y, m - 1, 1)
+      setRange({ startDate: fmt(startOfMonth(d)), endDate: fmt(endOfMonth(d)) })
+    } else if (id === 'año') {
+      const d = new Date(parseInt(selectedYear), 0, 1)
+      setRange({ startDate: fmt(startOfYear(d)), endDate: fmt(endOfYear(d)) })
+    }
+  }
+
+  const handleMonthChange = (val) => {
+    setSelectedMonth(val)
+    const [y, m] = val.split('-').map(Number)
+    const d = new Date(y, m - 1, 1)
+    setRange({ startDate: fmt(startOfMonth(d)), endDate: fmt(endOfMonth(d)) })
+  }
+
+  const handleYearChange = (val) => {
+    setSelectedYear(val)
+    const d = new Date(parseInt(val), 0, 1)
+    setRange({ startDate: fmt(startOfYear(d)), endDate: fmt(endOfYear(d)) })
+  }
+
+  const { transactions, loading, add, update, remove, totals } = useTransactions(
+    activePreset === 'todo' ? { all: true } : range
+  )
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [filter, setFilter] = useState('all')
@@ -55,12 +98,69 @@ export default function Transactions() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-txt-primary">Transacciones</h1>
-          <p className="text-txt-muted text-sm mt-0.5">Ingresos y gastos del mes</p>
+          <p className="text-txt-muted text-sm mt-0.5">Todos los movimientos</p>
         </div>
         <button onClick={() => { setEditing(null); setModalOpen(true) }} className="btn-primary flex items-center gap-2">
           <Plus size={16} />
           <span className="hidden sm:inline">Nueva</span>
         </button>
+      </div>
+
+      {/* Period selector */}
+      <div className="space-y-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handlePreset(p.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+                activePreset === p.id
+                  ? 'gradient-primary text-white'
+                  : 'bg-bg-elevated text-txt-secondary hover:text-txt-primary border border-white/10'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {activePreset === 'mes' && (
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            className="input text-xs py-1.5 w-44"
+          />
+        )}
+        {activePreset === 'año' && (
+          <select
+            value={selectedYear}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className="input text-xs py-1.5 w-32"
+          >
+            {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+              <option key={y} value={String(y)}>{y}</option>
+            ))}
+          </select>
+        )}
+        {activePreset === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={range.startDate}
+              max={range.endDate}
+              onChange={(e) => setRange((r) => ({ ...r, startDate: e.target.value }))}
+              className="input flex-1 text-xs py-1.5"
+            />
+            <span className="text-txt-muted text-xs shrink-0">→</span>
+            <input
+              type="date"
+              value={range.endDate}
+              min={range.startDate}
+              onChange={(e) => setRange((r) => ({ ...r, endDate: e.target.value }))}
+              className="input flex-1 text-xs py-1.5"
+            />
+          </div>
+        )}
       </div>
 
       {/* Totals */}
@@ -152,6 +252,12 @@ export default function Transactions() {
                         {t.debts.name}
                       </span>
                     )}
+                    {t.fixed_payments?.name && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded-md">
+                        <Receipt size={9} />
+                        {t.fixed_payments.name}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-0.5 shrink-0">
@@ -196,6 +302,12 @@ export default function Transactions() {
                             {t.debts.name}
                           </span>
                         )}
+                        {t.fixed_payments?.name && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded-md w-fit">
+                            <Receipt size={9} />
+                            {t.fixed_payments.name}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3.5 text-txt-muted hidden md:table-cell">{formatDateShort(t.date)}</td>
@@ -238,6 +350,7 @@ export default function Transactions() {
             description: editing.description,
             notes: editing.notes || '',
             debt_id: editing.debt_id || '',
+            fixed_payment_id: editing.fixed_payment_id || '',
           } : undefined}
         />
       </Modal>

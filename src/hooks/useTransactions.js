@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { monthStart, monthEnd, currentMonth } from '../utils/dateHelpers'
 
-export function useTransactions({ startDate, endDate } = {}) {
+export function useTransactions({ startDate, endDate, all } = {}) {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -14,17 +14,20 @@ export function useTransactions({ startDate, endDate } = {}) {
   const fetch = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const { data } = await supabase
+    let query = supabase
       .from('transactions')
-      .select('*, categories(name, color, icon, type), debts(id, name)')
+      .select('*, categories(name, color, icon, type), debts(id, name), fixed_payments(id, name)')
       .eq('user_id', user.id)
-      .gte('date', start)
-      .lte('date', end)
       .order('date', { ascending: false })
 
+    if (!all) {
+      query = query.gte('date', start).lte('date', end)
+    }
+
+    const { data } = await query
     setTransactions(data ?? [])
     setLoading(false)
-  }, [user, start, end])
+  }, [user, start, end, all])
 
   useEffect(() => { fetch() }, [fetch])
 
@@ -50,12 +53,22 @@ export function useTransactions({ startDate, endDate } = {}) {
     if (updateError) throw updateError
   }
 
+  const updateFixedPaymentStatus = async (fixedPaymentId, status) => {
+    const { error } = await supabase
+      .from('fixed_payments')
+      .update({ status })
+      .eq('id', fixedPaymentId)
+      .eq('user_id', user.id)
+    if (error) throw error
+  }
+
   const add = async (payload) => {
     const { error } = await supabase
       .from('transactions')
       .insert({ ...payload, user_id: user.id })
     if (error) throw error
     if (payload.debt_id) await updateDebtProgress(payload.debt_id, 1)
+    if (payload.fixed_payment_id) await updateFixedPaymentStatus(payload.fixed_payment_id, 'paid')
     await fetch()
   }
 
@@ -73,6 +86,7 @@ export function useTransactions({ startDate, endDate } = {}) {
     const { error } = await supabase.from('transactions').delete().eq('id', id)
     if (error) throw error
     if (tx?.debt_id) await updateDebtProgress(tx.debt_id, -1)
+    if (tx?.fixed_payment_id) await updateFixedPaymentStatus(tx.fixed_payment_id, 'pending')
     await fetch()
   }
 
