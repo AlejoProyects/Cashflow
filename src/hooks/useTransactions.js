@@ -28,11 +28,34 @@ export function useTransactions({ startDate, endDate } = {}) {
 
   useEffect(() => { fetch() }, [fetch])
 
+  const updateDebtProgress = async (debtId, delta) => {
+    const { data: debt, error: fetchError } = await supabase
+      .from('debts')
+      .select('paid_installments, total_installments, installment_amount')
+      .eq('id', debtId)
+      .eq('user_id', user.id)
+      .single()
+    if (fetchError || !debt) return
+    const currentPaid = parseInt(debt.paid_installments, 10) || 0
+    const totalInstallments = parseInt(debt.total_installments, 10) || 0
+    const installmentAmount = Number(debt.installment_amount) || 0
+    const newPaid = Math.min(Math.max(currentPaid + delta, 0), totalInstallments)
+    const newPaidAmount = installmentAmount * newPaid
+    const status = newPaid >= totalInstallments ? 'paid' : 'active'
+    const { error: updateError } = await supabase
+      .from('debts')
+      .update({ paid_installments: newPaid, paid_amount: newPaidAmount, status })
+      .eq('id', debtId)
+      .eq('user_id', user.id)
+    if (updateError) throw updateError
+  }
+
   const add = async (payload) => {
     const { error } = await supabase
       .from('transactions')
       .insert({ ...payload, user_id: user.id })
     if (error) throw error
+    if (payload.debt_id) await updateDebtProgress(payload.debt_id, 1)
     await fetch()
   }
 
@@ -46,8 +69,10 @@ export function useTransactions({ startDate, endDate } = {}) {
   }
 
   const remove = async (id) => {
+    const tx = transactions.find((t) => t.id === id)
     const { error } = await supabase.from('transactions').delete().eq('id', id)
     if (error) throw error
+    if (tx?.debt_id) await updateDebtProgress(tx.debt_id, -1)
     await fetch()
   }
 

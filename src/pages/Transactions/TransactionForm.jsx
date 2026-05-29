@@ -65,8 +65,8 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
     }
   }
 
-  const handleSubmitForm = (data) => {
-    onSubmit({
+  const handleSubmitForm = async (data) => {
+    await onSubmit({
       ...data,
       debt_id: isDebtPayment && data.debt_id ? data.debt_id : null,
     })

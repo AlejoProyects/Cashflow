@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Plus, Trash2, CreditCard, CheckCircle, Layers, Pencil } from 'lucide-react'
+import { Plus, Trash2, CreditCard, CheckCircle, Layers, Pencil, ChevronDown, History } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useDebts } from '../../hooks/useDebts'
+import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { formatDate } from '../../utils/dateHelpers'
 import Modal from '../../components/ui/Modal'
 import ProgressBar from '../../components/ui/ProgressBar'
 import EmptyState from '../../components/ui/EmptyState'
@@ -301,6 +303,26 @@ export default function Debts() {
   const [addOpen, setAddOpen] = useState(false)
   const [payDebt, setPayDebt] = useState(null)
   const [editDebt, setEditDebt] = useState(null)
+  const [expandedDebtId, setExpandedDebtId] = useState(null)
+  const [debtHistories, setDebtHistories] = useState({})
+  const [loadingHistoryId, setLoadingHistoryId] = useState(null)
+
+  const toggleHistory = async (debtId) => {
+    if (expandedDebtId === debtId) {
+      setExpandedDebtId(null)
+      return
+    }
+    setExpandedDebtId(debtId)
+    if (debtHistories[debtId]) return
+    setLoadingHistoryId(debtId)
+    const { data } = await supabase
+      .from('transactions')
+      .select('id, amount, date, description')
+      .eq('debt_id', debtId)
+      .order('date', { ascending: true })
+    setDebtHistories(prev => ({ ...prev, [debtId]: data || [] }))
+    setLoadingHistoryId(null)
+  }
 
   const active = debts.filter((d) => d.status === 'active')
   const paid = debts.filter((d) => d.status === 'paid')
@@ -382,12 +404,24 @@ export default function Debts() {
             const remaining = Number(d.total_installments) - Number(d.paid_installments)
             const remainingAmount = remaining * Number(d.installment_amount)
 
+            const txCount = debtHistories[d.id]?.length ?? 0
+            const nonTxPaid = Math.max(parseInt(d.paid_installments, 10) - txCount, 0)
+
             return (
               <div key={d.id} className="card">
                 {/* Header */}
                 <div className="mb-3">
                   <div className="flex items-start justify-between">
-                    <p className="text-txt-primary font-semibold text-base leading-snug flex-1">{d.name}</p>
+                    <button
+                      onClick={() => toggleHistory(d.id)}
+                      className="flex items-center gap-2 text-left flex-1 min-w-0 group"
+                    >
+                      <span className="text-txt-primary font-semibold text-base leading-snug">{d.name}</span>
+                      <ChevronDown
+                        size={14}
+                        className={`text-txt-muted shrink-0 transition-transform duration-200 group-hover:text-txt-secondary ${expandedDebtId === d.id ? 'rotate-180' : ''}`}
+                      />
+                    </button>
                     <div className="flex items-center gap-1 ml-2 shrink-0">
                       <button
                         onClick={() => setEditDebt(d)}
@@ -438,6 +472,53 @@ export default function Debts() {
                     </span>
                   </div>
                 </div>
+
+                {/* History panel */}
+                {expandedDebtId === d.id && (
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <History size={12} className="text-txt-muted" />
+                      <span className="text-[11px] font-medium text-txt-muted uppercase tracking-wider">Historial de pagos</span>
+                    </div>
+
+                    {loadingHistoryId === d.id ? (
+                      <div className="flex justify-center py-3"><Spinner size="sm" /></div>
+                    ) : (
+                      <div className="space-y-1">
+                        {/* Initial / non-transaction payments */}
+                        {nonTxPaid > 0 && (
+                          <div className="flex items-center justify-between text-xs px-2.5 py-2 rounded-lg bg-bg-elevated">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-txt-muted shrink-0" />
+                              <span className="text-txt-muted">
+                                Abono inicial al crear la deuda
+                              </span>
+                            </div>
+                            <span className="text-txt-secondary font-medium shrink-0 ml-2">
+                              {nonTxPaid} cuota{nonTxPaid !== 1 ? 's' : ''} · {formatCurrency(nonTxPaid * Number(d.installment_amount))}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Transaction-based payments */}
+                        {(debtHistories[d.id] || []).map((tx) => (
+                          <div key={tx.id} className="flex items-center justify-between text-xs px-2.5 py-2 rounded-lg bg-bg-elevated">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
+                              <span className="text-txt-muted shrink-0">{formatDate(tx.date)}</span>
+                              <span className="text-txt-secondary truncate">{tx.description}</span>
+                            </div>
+                            <span className="text-success font-medium shrink-0 ml-2">{formatCurrency(tx.amount)}</span>
+                          </div>
+                        ))}
+
+                        {nonTxPaid === 0 && (debtHistories[d.id] || []).length === 0 && (
+                          <p className="text-txt-muted text-xs text-center py-3">Sin pagos registrados</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
