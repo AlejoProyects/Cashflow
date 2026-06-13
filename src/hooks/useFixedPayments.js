@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { currentMonth } from '../utils/dateHelpers'
@@ -7,6 +7,7 @@ export function useFixedPayments(month = currentMonth()) {
   const { user } = useAuth()
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
+  const ensuringRef = useRef(false)
 
   const fetch = useCallback(async () => {
     if (!user) return
@@ -23,36 +24,54 @@ export function useFixedPayments(month = currentMonth()) {
 
   useEffect(() => { fetch() }, [fetch])
 
-  const ensureMonthExists = async () => {
-    if (payments.length > 0) return
-    const { data: prev } = await supabase
-      .from('fixed_payments')
-      .select('*')
-      .eq('user_id', user.id)
-      .neq('month', month)
-      .order('month', { ascending: false })
-      .limit(50)
+  const ensureMonthExists = useCallback(async () => {
+    if (!user) return
+    // Evita que dos ejecuciones simultáneas (StrictMode/remontaje) inserten duplicados.
+    if (ensuringRef.current) return
+    ensuringRef.current = true
+    try {
+      // Consultamos el mes actual directo de la BD en vez del estado de React,
+      // que puede estar obsoleto (vacío) cuando este efecto corre al montar.
+      const { data: current } = await supabase
+        .from('fixed_payments')
+        .select('name')
+        .eq('user_id', user.id)
+        .eq('month', month)
 
-    if (!prev || prev.length === 0) return
+      const existingNames = new Set((current ?? []).map((p) => p.name))
+      if (existingNames.size > 0) return
 
-    const seen = new Set()
-    const unique = prev.filter((p) => {
-      if (seen.has(p.name)) return false
-      seen.add(p.name)
-      return true
-    })
+      const { data: prev } = await supabase
+        .from('fixed_payments')
+        .select('*')
+        .eq('user_id', user.id)
+        .neq('month', month)
+        .order('month', { ascending: false })
+        .limit(50)
 
-    const newRows = unique.map(({ id, created_at, status, ...rest }) => ({
-      ...rest,
-      month,
-      status: 'pending',
-    }))
+      if (!prev || prev.length === 0) return
 
-    if (newRows.length > 0) {
-      await supabase.from('fixed_payments').insert(newRows)
-      await fetch()
+      const seen = new Set()
+      const unique = prev.filter((p) => {
+        if (seen.has(p.name) || existingNames.has(p.name)) return false
+        seen.add(p.name)
+        return true
+      })
+
+      const newRows = unique.map(({ id, created_at, status, ...rest }) => ({
+        ...rest,
+        month,
+        status: 'pending',
+      }))
+
+      if (newRows.length > 0) {
+        await supabase.from('fixed_payments').insert(newRows)
+        await fetch()
+      }
+    } finally {
+      ensuringRef.current = false
     }
-  }
+  }, [user, month, fetch])
 
   const add = async (payload) => {
     const { error } = await supabase

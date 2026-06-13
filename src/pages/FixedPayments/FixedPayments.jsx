@@ -22,13 +22,27 @@ const schema = z.object({
 
 function AddForm({ onSubmit, onCancel }) {
   const { categories } = useCategories('expense')
+  const [submitError, setSubmitError] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { due_day: 1 },
   })
 
+  const submit = async (data) => {
+    setSubmitError('')
+    try {
+      await onSubmit(data)
+    } catch (err) {
+      if (err?.code === '23505') {
+        setSubmitError('Ya existe un pago fijo con ese nombre este mes.')
+      } else {
+        setSubmitError(err?.message || 'No se pudo guardar. Intenta de nuevo.')
+      }
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(submit)} className="space-y-4">
       <div>
         <label className="label">Nombre</label>
         <input {...register('name')} placeholder="Ej: Netflix, Arriendo" className="input" />
@@ -58,6 +72,11 @@ function AddForm({ onSubmit, onCancel }) {
         <label className="label">Notas</label>
         <input {...register('notes')} placeholder="Opcional" className="input" />
       </div>
+      {submitError && (
+        <p className="text-danger text-sm bg-danger/10 border border-danger/20 rounded-lg px-3 py-2">
+          {submitError}
+        </p>
+      )}
       <div className="flex gap-2 pt-2">
         <button type="button" onClick={onCancel} className="btn-secondary flex-1">Cancelar</button>
         <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">Guardar</button>
@@ -70,7 +89,7 @@ export default function FixedPayments() {
   const { payments, loading, add, togglePaid, remove, resetMonth, ensureMonthExists } = useFixedPayments()
   const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => { ensureMonthExists() }, [])
+  useEffect(() => { ensureMonthExists() }, [ensureMonthExists])
 
   const pending = payments.filter((p) => p.status === 'pending')
   const paid = payments.filter((p) => p.status === 'paid')
