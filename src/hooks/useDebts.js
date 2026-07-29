@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
+import { currentMonth } from '../utils/dateHelpers'
 
 export function useDebts() {
   const { user } = useAuth()
@@ -56,7 +57,56 @@ export function useDebts() {
     )
     const newPaidAmount = Number(debt.installment_amount) * newPaid
     const status = newPaid >= Number(debt.total_installments) ? 'paid' : 'active'
-    await update(id, { paid_installments: newPaid, paid_amount: newPaidAmount, status })
+    await update(id, {
+      paid_installments: newPaid,
+      paid_amount: newPaidAmount,
+      status,
+      last_payment_month: currentMonth(),
+    })
+  }
+
+  // Toggle whether this month's installment is marked as paid (tachado)
+  const toggleMonthlyPayment = async (id) => {
+    const debt = debts.find((d) => d.id === id)
+    if (!debt) return
+    const paidThisMonth = debt.last_payment_month === currentMonth()
+    const delta = paidThisMonth ? -1 : 1
+    const newPaid = Math.min(
+      Math.max(Number(debt.paid_installments) + delta, 0),
+      Number(debt.total_installments)
+    )
+    const newPaidAmount = Number(debt.installment_amount) * newPaid
+    const status = newPaid >= Number(debt.total_installments) ? 'paid' : 'active'
+    await update(id, {
+      paid_installments: newPaid,
+      paid_amount: newPaidAmount,
+      status,
+      last_payment_month: paidThisMonth ? null : currentMonth(),
+    })
+  }
+
+  // Revert this month's marked payments back to pending
+  const resetMonth = async () => {
+    const month = currentMonth()
+    const toReset = debts.filter((d) => d.last_payment_month === month)
+    if (toReset.length === 0) return
+    await Promise.all(
+      toReset.map((d) => {
+        const newPaid = Math.max(Number(d.paid_installments) - 1, 0)
+        const newPaidAmount = Number(d.installment_amount) * newPaid
+        const status = newPaid >= Number(d.total_installments) ? 'paid' : 'active'
+        return supabase
+          .from('debts')
+          .update({
+            paid_installments: newPaid,
+            paid_amount: newPaidAmount,
+            status,
+            last_payment_month: null,
+          })
+          .eq('id', d.id)
+      })
+    )
+    await refetch()
   }
 
   const remove = async (id) => {
@@ -78,5 +128,5 @@ export function useDebts() {
     )
   totals.pending = totals.total - totals.paid
 
-  return { debts, loading, add, update, payInstallments, remove, totals }
+  return { debts, loading, add, update, payInstallments, toggleMonthlyPayment, resetMonth, remove, totals }
 }

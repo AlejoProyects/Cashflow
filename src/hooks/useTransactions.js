@@ -47,7 +47,12 @@ export function useTransactions({ startDate, endDate, all } = {}) {
     const status = newPaid >= totalInstallments ? 'paid' : 'active'
     const { error: updateError } = await supabase
       .from('debts')
-      .update({ paid_installments: newPaid, paid_amount: newPaidAmount, status })
+      .update({
+        paid_installments: newPaid,
+        paid_amount: newPaidAmount,
+        status,
+        last_payment_month: delta > 0 ? currentMonth() : null,
+      })
       .eq('id', debtId)
       .eq('user_id', user.id)
     if (updateError) throw updateError

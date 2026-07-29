@@ -47,7 +47,8 @@ CREATE TABLE public.debts (
   paid_amount         numeric(12,2) DEFAULT 0,
   status              text DEFAULT 'active' CHECK (status IN ('active', 'paid')),
   notes               text,
-  created_at          timestamptz DEFAULT now()
+  created_at          timestamptz DEFAULT now(),
+  last_payment_month  text
 );
 
 -- FIXED PAYMENTS

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Plus, Trash2, CreditCard, CheckCircle, Layers, Pencil, ChevronDown, History } from 'lucide-react'
+import { Plus, Trash2, CreditCard, CheckCircle, Check, Layers, Pencil, ChevronDown, History, RotateCcw } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useDebts } from '../../hooks/useDebts'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { formatDate } from '../../utils/dateHelpers'
+import { formatDate, currentMonth, currentMonthLabel } from '../../utils/dateHelpers'
 import Modal from '../../components/ui/Modal'
 import ProgressBar from '../../components/ui/ProgressBar'
 import EmptyState from '../../components/ui/EmptyState'
@@ -299,7 +299,7 @@ function PayModal({ debt, onConfirm, onClose }) {
 }
 
 export default function Debts() {
-  const { debts, loading, add, update, payInstallments, remove, totals } = useDebts()
+  const { debts, loading, add, update, payInstallments, toggleMonthlyPayment, resetMonth, remove, totals } = useDebts()
   const [addOpen, setAddOpen] = useState(false)
   const [payDebt, setPayDebt] = useState(null)
   const [editDebt, setEditDebt] = useState(null)
@@ -332,6 +332,8 @@ export default function Debts() {
       return remA - remB
     })
   const paid = debts.filter((d) => d.status === 'paid')
+  const month = currentMonth()
+  const paidThisMonthCount = active.filter((d) => d.last_payment_month === month).length
 
   const handleAdd = async (data) => {
     await add(data)
@@ -365,11 +367,22 @@ export default function Debts() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-txt-primary">Deudas</h1>
-          <p className="text-txt-muted text-sm mt-0.5">Seguimiento de créditos y cuotas</p>
+          <p className="text-txt-muted text-sm mt-0.5 capitalize">{currentMonthLabel()}</p>
         </div>
-        <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /><span className="hidden sm:inline">Nueva deuda</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {paidThisMonthCount > 0 && (
+            <button
+              onClick={() => { if (confirm('¿Reiniciar las cuotas marcadas como pagadas este mes?')) resetMonth() }}
+              className="btn-secondary flex items-center gap-1.5 text-sm"
+            >
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline">Reiniciar mes</span>
+            </button>
+          )}
+          <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /><span className="hidden sm:inline">Nueva deuda</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -412,22 +425,36 @@ export default function Debts() {
 
             const txCount = debtHistories[d.id]?.length ?? 0
             const nonTxPaid = Math.max(parseInt(d.paid_installments, 10) - txCount, 0)
+            const paidThisMonth = d.last_payment_month === month
 
             return (
-              <div key={d.id} className="card">
+              <div key={d.id} className={`card ${paidThisMonth ? 'opacity-70' : ''}`}>
                 {/* Header */}
                 <div className="mb-3">
                   <div className="flex items-start justify-between">
-                    <button
-                      onClick={() => toggleHistory(d.id)}
-                      className="flex items-center gap-2 text-left flex-1 min-w-0 group"
-                    >
-                      <span className="text-txt-primary font-semibold text-base leading-snug">{d.name}</span>
-                      <ChevronDown
-                        size={14}
-                        className={`text-txt-muted shrink-0 transition-transform duration-200 group-hover:text-txt-secondary ${expandedDebtId === d.id ? 'rotate-180' : ''}`}
-                      />
-                    </button>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <button
+                        onClick={() => toggleMonthlyPayment(d.id)}
+                        title={paidThisMonth ? 'Marcar cuota de este mes como pendiente' : 'Marcar cuota de este mes como pagada'}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                          paidThisMonth
+                            ? 'gradient-success'
+                            : 'border-2 border-warning/60 hover:bg-warning/10'
+                        }`}
+                      >
+                        {paidThisMonth && <Check size={12} className="text-white" />}
+                      </button>
+                      <button
+                        onClick={() => toggleHistory(d.id)}
+                        className="flex items-center gap-2 text-left flex-1 min-w-0 group"
+                      >
+                        <span className={`text-txt-primary font-semibold text-base leading-snug ${paidThisMonth ? 'line-through' : ''}`}>{d.name}</span>
+                        <ChevronDown
+                          size={14}
+                          className={`text-txt-muted shrink-0 transition-transform duration-200 group-hover:text-txt-secondary ${expandedDebtId === d.id ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </div>
                     <div className="flex items-center gap-1 ml-2 shrink-0">
                       <button
                         onClick={() => setEditDebt(d)}
