@@ -22,7 +22,7 @@ export function useDebts() {
 
   useEffect(() => { refetch() }, [refetch])
 
-  const add = async ({ name, installment_amount, total_installments, paid_installments = 0, notes }) => {
+  const add = async ({ name, installment_amount, total_installments, paid_installments = 0, is_monthly = true, notes }) => {
     const totalAmt = Number(installment_amount) * Number(total_installments)
     const paidAmt = Number(installment_amount) * Number(paid_installments)
     const status = paid_installments >= total_installments ? 'paid' : 'active'
@@ -35,6 +35,7 @@ export function useDebts() {
       total_amount: totalAmt,
       paid_amount: paidAmt,
       status,
+      is_monthly: !!is_monthly,
       notes: notes || null,
     })
     if (error) throw error
@@ -122,9 +123,15 @@ export function useDebts() {
         acc.total += Number(d.total_amount)
         acc.paid += Number(d.paid_amount)
         acc.installmentsLeft += Number(d.total_installments) - Number(d.paid_installments)
+        if (d.is_monthly) {
+          acc.monthlyForecast += Number(d.installment_amount)
+          if (d.last_payment_month === currentMonth()) {
+            acc.monthlyCovered += Number(d.installment_amount)
+          }
+        }
         return acc
       },
-      { total: 0, paid: 0, installmentsLeft: 0 }
+      { total: 0, paid: 0, installmentsLeft: 0, monthlyForecast: 0, monthlyCovered: 0 }
     )
   totals.pending = totals.total - totals.paid
 

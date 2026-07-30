@@ -48,7 +48,8 @@ CREATE TABLE public.debts (
   status              text DEFAULT 'active' CHECK (status IN ('active', 'paid')),
   notes               text,
   created_at          timestamptz DEFAULT now(),
-  last_payment_month  text
+  last_payment_month  text,
+  is_monthly          boolean NOT NULL DEFAULT true
 );
 
 -- FIXED PAYMENTS
@@ -76,6 +77,18 @@ CREATE TABLE public.budgets (
   UNIQUE (user_id, category_id, month)
 );
 
+-- PLANNED EXPENSES (one-off payments planned for a month, shown in Presupuesto)
+CREATE TABLE public.planned_expenses (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  name        text NOT NULL,
+  amount      numeric(12,2) NOT NULL,
+  status      text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
+  month       text NOT NULL,
+  notes       text,
+  created_at  timestamptz DEFAULT now()
+);
+
 -- SAVINGS GOALS
 CREATE TABLE public.savings_goals (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -100,6 +113,7 @@ ALTER TABLE public.debts          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fixed_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budgets        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.savings_goals  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.planned_expenses ENABLE ROW LEVEL SECURITY;
 
 -- Profiles
 CREATE POLICY "profiles_owner" ON public.profiles
@@ -127,6 +141,10 @@ CREATE POLICY "budgets_owner" ON public.budgets
 
 -- Savings goals
 CREATE POLICY "savings_goals_owner" ON public.savings_goals
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+-- Planned expenses
+CREATE POLICY "planned_expenses_owner" ON public.planned_expenses
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 -- ============================================================

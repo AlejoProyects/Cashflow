@@ -11,11 +11,13 @@ import Modal from '../../components/ui/Modal'
 import ProgressBar from '../../components/ui/ProgressBar'
 import EmptyState from '../../components/ui/EmptyState'
 import Spinner from '../../components/ui/Spinner'
+import Badge from '../../components/ui/Badge'
 
 const debtSchema = z.object({
   name: z.string().min(1, 'Nombre requerido'),
   installment_amount: z.coerce.number().positive('El valor de la cuota debe ser mayor a 0'),
   total_installments: z.coerce.number().int().min(1, 'Debe ser al menos 1 cuota'),
+  is_monthly: z.boolean().optional(),
   has_previous: z.boolean().optional(),
   paid_installments: z.coerce.number().int().min(0).optional(),
   paid_by_value: z.boolean().optional(),
@@ -33,12 +35,14 @@ function DebtForm({ onSubmit, onCancel, debt = null }) {
           installment_amount: debt.installment_amount,
           total_installments: debt.total_installments,
           paid_installments: debt.paid_installments,
+          is_monthly: debt.is_monthly ?? true,
           notes: debt.notes || '',
           has_previous: false,
           paid_by_value: false,
           previous_value: 0,
         }
       : {
+          is_monthly: true,
           has_previous: false,
           paid_by_value: false,
           paid_installments: 0,
@@ -46,6 +50,7 @@ function DebtForm({ onSubmit, onCancel, debt = null }) {
         },
   })
 
+  const isMonthly = watch('is_monthly')
   const hasPrevious = watch('has_previous')
   const paidByValue = watch('paid_by_value')
   const installmentAmount = watch('installment_amount')
@@ -75,6 +80,7 @@ function DebtForm({ onSubmit, onCancel, debt = null }) {
       installment_amount: data.installment_amount,
       total_installments: data.total_installments,
       paid_installments: paidInstallments,
+      is_monthly: !!data.is_monthly,
       notes: data.notes,
     })
   }
@@ -113,6 +119,24 @@ function DebtForm({ onSubmit, onCancel, debt = null }) {
           <span className="text-primary-light font-bold text-lg">{formatCurrency(totalPreview)}</span>
         </div>
       )}
+
+      {/* Monthly forecast toggle */}
+      <div>
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => setValue('is_monthly', !isMonthly)}
+            className={`relative w-10 h-5 rounded-full transition-colors ${
+              isMonthly ? 'bg-primary' : 'bg-bg-elevated border border-white/20'
+            }`}
+          >
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+              isMonthly ? 'translate-x-5' : 'translate-x-0.5'
+            }`} />
+          </div>
+          <span className="text-txt-secondary text-sm">¿Es un pago mensual?</span>
+        </label>
+        <p className="text-txt-muted text-xs mt-1 ml-[3.25rem]">Se sumará a tu presupuesto previsto de cada mes en la pestaña Presupuesto.</p>
+      </div>
 
       {/* Edit mode: show paid_installments directly */}
       {isEdit && (
@@ -345,7 +369,7 @@ export default function Debts() {
     setPayDebt(null)
   }
 
-  const handleEdit = async ({ name, installment_amount, total_installments, paid_installments, notes }) => {
+  const handleEdit = async ({ name, installment_amount, total_installments, paid_installments, is_monthly, notes }) => {
     const totalAmt = Number(installment_amount) * Number(total_installments)
     const paidAmt = Number(installment_amount) * Number(paid_installments)
     const status = Number(paid_installments) >= Number(total_installments) ? 'paid' : 'active'
@@ -357,6 +381,7 @@ export default function Debts() {
       total_amount: totalAmt,
       paid_amount: paidAmt,
       status,
+      is_monthly: !!is_monthly,
       notes: notes || null,
     })
     setEditDebt(null)
@@ -449,6 +474,7 @@ export default function Debts() {
                         className="flex items-center gap-2 text-left flex-1 min-w-0 group"
                       >
                         <span className={`text-txt-primary font-semibold text-base leading-snug ${paidThisMonth ? 'line-through' : ''}`}>{d.name}</span>
+                        {d.is_monthly && <Badge variant="primary" className="text-[9px] px-1.5 py-0.5 shrink-0">Mensual</Badge>}
                         <ChevronDown
                           size={14}
                           className={`text-txt-muted shrink-0 transition-transform duration-200 group-hover:text-txt-secondary ${expandedDebtId === d.id ? 'rotate-180' : ''}`}
