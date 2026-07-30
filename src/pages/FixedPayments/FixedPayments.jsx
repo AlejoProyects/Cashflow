@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Check, Trash2, Calendar, RotateCcw } from 'lucide-react'
+import { Plus, Check, Trash2, Calendar, RotateCcw, Pencil } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,12 +20,21 @@ const schema = z.object({
   notes: z.string().optional(),
 })
 
-function AddForm({ onSubmit, onCancel }) {
+function PaymentForm({ onSubmit, onCancel, payment = null }) {
+  const isEdit = !!payment
   const { categories } = useCategories('expense')
   const [submitError, setSubmitError] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { due_day: 1 },
+    defaultValues: isEdit
+      ? {
+          name: payment.name,
+          amount: payment.amount,
+          due_day: payment.due_day,
+          category_id: payment.category_id || '',
+          notes: payment.notes || '',
+        }
+      : { due_day: 1 },
   })
 
   const submit = async (data) => {
@@ -79,15 +88,18 @@ function AddForm({ onSubmit, onCancel }) {
       )}
       <div className="flex gap-2 pt-2">
         <button type="button" onClick={onCancel} className="btn-secondary flex-1">Cancelar</button>
-        <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">Guardar</button>
+        <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
+          {isSubmitting ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Guardar'}
+        </button>
       </div>
     </form>
   )
 }
 
 export default function FixedPayments() {
-  const { payments, loading, add, togglePaid, remove, resetMonth, ensureMonthExists } = useFixedPayments()
+  const { payments, loading, add, update, togglePaid, remove, resetMonth, ensureMonthExists } = useFixedPayments()
   const [addOpen, setAddOpen] = useState(false)
+  const [editPayment, setEditPayment] = useState(null)
 
   useEffect(() => { ensureMonthExists() }, [ensureMonthExists])
 
@@ -99,6 +111,11 @@ export default function FixedPayments() {
   const handleAdd = async (data) => {
     await add(data)
     setAddOpen(false)
+  }
+
+  const handleEdit = async (data) => {
+    await update(editPayment.id, data)
+    setEditPayment(null)
   }
 
   return (
@@ -165,6 +182,9 @@ export default function FixedPayments() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-warning font-bold">{formatCurrency(p.amount)}</span>
+                      <button onClick={() => setEditPayment(p)} className="p-1.5 rounded-lg text-txt-muted hover:text-primary-light hover:bg-primary/10 transition-colors">
+                        <Pencil size={13} />
+                      </button>
                       <button onClick={() => remove(p.id)} className="p-1.5 rounded-lg text-txt-muted hover:text-danger hover:bg-danger/10 transition-colors">
                         <Trash2 size={13} />
                       </button>
@@ -193,6 +213,9 @@ export default function FixedPayments() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-success font-bold">{formatCurrency(p.amount)}</span>
+                      <button onClick={() => setEditPayment(p)} className="p-1.5 rounded-lg text-txt-muted hover:text-primary-light hover:bg-primary/10 transition-colors">
+                        <Pencil size={13} />
+                      </button>
                       <button onClick={() => remove(p.id)} className="p-1.5 rounded-lg text-txt-muted hover:text-danger hover:bg-danger/10 transition-colors">
                         <Trash2 size={13} />
                       </button>
@@ -206,7 +229,13 @@ export default function FixedPayments() {
       )}
 
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Nuevo pago fijo">
-        <AddForm onSubmit={handleAdd} onCancel={() => setAddOpen(false)} />
+        <PaymentForm onSubmit={handleAdd} onCancel={() => setAddOpen(false)} />
+      </Modal>
+
+      <Modal isOpen={!!editPayment} onClose={() => setEditPayment(null)} title="Editar pago fijo">
+        {editPayment && (
+          <PaymentForm payment={editPayment} onSubmit={handleEdit} onCancel={() => setEditPayment(null)} />
+        )}
       </Modal>
     </div>
   )

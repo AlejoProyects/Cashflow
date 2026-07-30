@@ -81,6 +81,15 @@ export function useFixedPayments(month = currentMonth()) {
     await fetch()
   }
 
+  const update = async (id, payload) => {
+    const { error } = await supabase
+      .from('fixed_payments')
+      .update(payload)
+      .eq('id', id)
+    if (error) throw error
+    await fetch()
+  }
+
   const togglePaid = async (id, currentStatus) => {
     const { error } = await supabase
       .from('fixed_payments')
@@ -107,5 +116,5 @@ export function useFixedPayments(month = currentMonth()) {
     await fetch()
   }
 
-  return { payments, loading, add, togglePaid, remove, resetMonth, ensureMonthExists, refetch: fetch }
+  return { payments, loading, add, update, togglePaid, remove, resetMonth, ensureMonthExists, refetch: fetch }
 }
