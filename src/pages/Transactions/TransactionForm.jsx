@@ -8,6 +8,7 @@ import { useCategories } from '../../hooks/useCategories'
 import { useDebts } from '../../hooks/useDebts'
 import { useFixedPayments } from '../../hooks/useFixedPayments'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { currentMonth } from '../../utils/dateHelpers'
 
 const schema = z.object({
   type: z.enum(['income', 'expense']),
@@ -38,6 +39,7 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
   const { categories } = useCategories(type)
   const { debts } = useDebts()
   const activeDebts = debts.filter((d) => d.status === 'active')
+  const unpaidDebts = activeDebts.filter((d) => d.last_payment_month !== currentMonth())
   const { payments: fixedPayments } = useFixedPayments()
 
   const [isDebtPayment, setIsDebtPayment] = useState(!!(defaultValues?.debt_id))
@@ -82,7 +84,7 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
     const id = e.target.value || null
     setValue('debt_id', id)
     if (id) {
-      const debt = activeDebts.find((d) => d.id === id)
+      const debt = debts.find((d) => d.id === id)
       if (debt) {
         setValue('amount', debt.installment_amount)
         if (!defaultValues?.description) {
@@ -115,6 +117,11 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
   const dropdownPayments = selectedPayment && selectedPayment.status !== 'pending'
     ? [...pendingPayments, selectedPayment]
     : pendingPayments
+
+  const selectedDebt = selectedDebtId ? debts.find((d) => d.id === selectedDebtId) : null
+  const dropdownDebts = selectedDebt && selectedDebt.last_payment_month === currentMonth()
+    ? [...unpaidDebts, selectedDebt]
+    : unpaidDebts
 
   return (
     <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-4">
@@ -191,7 +198,7 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
                 className="input"
               >
                 <option value="">Seleccionar deuda...</option>
-                {activeDebts.map((d) => (
+                {dropdownDebts.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name} — cuota {formatCurrency(d.installment_amount)}
                   </option>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, CreditCard, CheckCircle, Check, Layers, Pencil, ChevronDown, History, RotateCcw } from 'lucide-react'
+import { Plus, Trash2, CreditCard, CheckCircle, Check, Layers, Pencil, ChevronDown, History } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -323,7 +323,7 @@ function PayModal({ debt, onConfirm, onClose }) {
 }
 
 export default function Debts() {
-  const { debts, loading, add, update, payInstallments, toggleMonthlyPayment, resetMonth, remove, totals } = useDebts()
+  const { debts, loading, add, update, payInstallments, toggleMonthlyPayment, remove, totals } = useDebts()
   const [addOpen, setAddOpen] = useState(false)
   const [payDebt, setPayDebt] = useState(null)
   const [editDebt, setEditDebt] = useState(null)
@@ -357,7 +357,6 @@ export default function Debts() {
     })
   const paid = debts.filter((d) => d.status === 'paid')
   const month = currentMonth()
-  const paidThisMonthCount = active.filter((d) => d.last_payment_month === month).length
 
   const handleAdd = async (data) => {
     await add(data)
@@ -394,20 +393,9 @@ export default function Debts() {
           <h1 className="text-2xl font-bold text-txt-primary">Deudas</h1>
           <p className="text-txt-muted text-sm mt-0.5 capitalize">{currentMonthLabel()}</p>
         </div>
-        <div className="flex items-center gap-2">
-          {paidThisMonthCount > 0 && (
-            <button
-              onClick={() => { if (confirm('¿Reiniciar las cuotas marcadas como pagadas este mes?')) resetMonth() }}
-              className="btn-secondary flex items-center gap-1.5 text-sm"
-            >
-              <RotateCcw size={14} />
-              <span className="hidden sm:inline">Reiniciar mes</span>
-            </button>
-          )}
-          <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
-            <Plus size={16} /><span className="hidden sm:inline">Nueva deuda</span>
-          </button>
-        </div>
+        <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
+          <Plus size={16} /><span className="hidden sm:inline">Nueva deuda</span>
+        </button>
       </div>
 
       {/* Summary */}
