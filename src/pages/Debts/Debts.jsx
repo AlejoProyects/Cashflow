@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { useDebts } from '../../hooks/useDebts'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { formatDate, currentMonth, currentMonthLabel } from '../../utils/dateHelpers'
+import { formatDate, currentMonthLabel } from '../../utils/dateHelpers'
 import Modal from '../../components/ui/Modal'
 import ProgressBar from '../../components/ui/ProgressBar'
 import EmptyState from '../../components/ui/EmptyState'
@@ -356,7 +356,6 @@ export default function Debts() {
       return remA - remB
     })
   const paid = debts.filter((d) => d.status === 'paid')
-  const month = currentMonth()
 
   const handleAdd = async (data) => {
     await add(data)
@@ -438,7 +437,7 @@ export default function Debts() {
 
             const txCount = debtHistories[d.id]?.length ?? 0
             const nonTxPaid = Math.max(parseInt(d.paid_installments, 10) - txCount, 0)
-            const paidThisMonth = d.last_payment_month === month
+            const paidThisMonth = !!d.last_payment_month
 
             return (
               <div key={d.id} className={`card ${paidThisMonth ? 'opacity-70' : ''}`}>
@@ -448,7 +447,7 @@ export default function Debts() {
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <button
                         onClick={() => toggleMonthlyPayment(d.id)}
-                        title={paidThisMonth ? 'Marcar cuota de este mes como pendiente' : 'Marcar cuota de este mes como pagada'}
+                        title={paidThisMonth ? 'Desmarcar como cubierta (no afecta las cuotas pagadas)' : 'Marcar como cubierta este mes (no afecta las cuotas pagadas)'}
                         className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                           paidThisMonth
                             ? 'gradient-success'

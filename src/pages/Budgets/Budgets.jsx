@@ -9,7 +9,7 @@ import { useFixedPayments } from '../../hooks/useFixedPayments'
 import { useDebts } from '../../hooks/useDebts'
 import { usePlannedExpenses } from '../../hooks/usePlannedExpenses'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { currentMonth, currentMonthLabel } from '../../utils/dateHelpers'
+import { currentMonthLabel } from '../../utils/dateHelpers'
 import Modal from '../../components/ui/Modal'
 import ProgressBar from '../../components/ui/ProgressBar'
 import EmptyState from '../../components/ui/EmptyState'
@@ -121,7 +121,6 @@ export default function Budgets() {
   const [addOneTimeOpen, setAddOneTimeOpen] = useState(false)
 
   const loading = budgetsLoading || fixedLoading || debtsLoading || oneTimeLoading
-  const month = currentMonth()
 
   const monthlyDebts = debts.filter((d) => d.is_monthly && d.status === 'active')
   const fixedPaymentCategoryIds = new Set(fixedPayments.map((p) => p.category_id).filter(Boolean))
@@ -237,7 +236,7 @@ export default function Budgets() {
                     label={d.name}
                     sublabel="Cuota mensual · Deuda"
                     amount={d.installment_amount}
-                    isDone={d.last_payment_month === month}
+                    isDone={!!d.last_payment_month}
                     onToggle={() => toggleMonthlyPayment(d.id)}
                   />
                 ))}

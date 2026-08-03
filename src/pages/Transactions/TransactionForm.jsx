@@ -8,7 +8,6 @@ import { useCategories } from '../../hooks/useCategories'
 import { useDebts } from '../../hooks/useDebts'
 import { useFixedPayments } from '../../hooks/useFixedPayments'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { currentMonth } from '../../utils/dateHelpers'
 
 const schema = z.object({
   type: z.enum(['income', 'expense']),
@@ -39,7 +38,7 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
   const { categories } = useCategories(type)
   const { debts } = useDebts()
   const activeDebts = debts.filter((d) => d.status === 'active')
-  const unpaidDebts = activeDebts.filter((d) => d.last_payment_month !== currentMonth())
+  const unpaidDebts = activeDebts.filter((d) => !d.last_payment_month)
   const { payments: fixedPayments } = useFixedPayments()
 
   const [isDebtPayment, setIsDebtPayment] = useState(!!(defaultValues?.debt_id))
@@ -119,7 +118,7 @@ export default function TransactionForm({ onSubmit, onCancel, defaultValues }) {
     : pendingPayments
 
   const selectedDebt = selectedDebtId ? debts.find((d) => d.id === selectedDebtId) : null
-  const dropdownDebts = selectedDebt && selectedDebt.last_payment_month === currentMonth()
+  const dropdownDebts = selectedDebt && selectedDebt.last_payment_month
     ? [...unpaidDebts, selectedDebt]
     : unpaidDebts
 

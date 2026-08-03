@@ -66,47 +66,26 @@ export function useDebts() {
     })
   }
 
-  // Toggle whether this month's installment is marked as paid (tachado)
+  // Marca/desmarca la deuda como cubierta en el checklist mensual.
+  // Es solo un check informativo: no toca paid_installments/paid_amount/status,
+  // y no se reinicia solo al cambiar de mes — persiste hasta que se desmarque
+  // manualmente o se use "Reiniciar mes".
   const toggleMonthlyPayment = async (id) => {
     const debt = debts.find((d) => d.id === id)
     if (!debt) return
-    const paidThisMonth = debt.last_payment_month === currentMonth()
-    const delta = paidThisMonth ? -1 : 1
-    const newPaid = Math.min(
-      Math.max(Number(debt.paid_installments) + delta, 0),
-      Number(debt.total_installments)
-    )
-    const newPaidAmount = Number(debt.installment_amount) * newPaid
-    const status = newPaid >= Number(debt.total_installments) ? 'paid' : 'active'
-    await update(id, {
-      paid_installments: newPaid,
-      paid_amount: newPaidAmount,
-      status,
-      last_payment_month: paidThisMonth ? null : currentMonth(),
-    })
+    const isCovered = !!debt.last_payment_month
+    await update(id, { last_payment_month: isCovered ? null : currentMonth() })
   }
 
-  // Revert this month's marked payments back to pending
+  // Desmarca manualmente las deudas cubiertas del checklist (no afecta paid_installments).
   const resetMonth = async () => {
-    const month = currentMonth()
-    const toReset = debts.filter((d) => d.last_payment_month === month)
-    if (toReset.length === 0) return
-    await Promise.all(
-      toReset.map((d) => {
-        const newPaid = Math.max(Number(d.paid_installments) - 1, 0)
-        const newPaidAmount = Number(d.installment_amount) * newPaid
-        const status = newPaid >= Number(d.total_installments) ? 'paid' : 'active'
-        return supabase
-          .from('debts')
-          .update({
-            paid_installments: newPaid,
-            paid_amount: newPaidAmount,
-            status,
-            last_payment_month: null,
-          })
-          .eq('id', d.id)
-      })
-    )
+    const ids = debts.filter((d) => d.last_payment_month).map((d) => d.id)
+    if (ids.length === 0) return
+    const { error } = await supabase
+      .from('debts')
+      .update({ last_payment_month: null })
+      .in('id', ids)
+    if (error) throw error
     await refetch()
   }
 
@@ -125,7 +104,7 @@ export function useDebts() {
         acc.installmentsLeft += Number(d.total_installments) - Number(d.paid_installments)
         if (d.is_monthly) {
           acc.monthlyForecast += Number(d.installment_amount)
-          if (d.last_payment_month === currentMonth()) {
+          if (d.last_payment_month) {
             acc.monthlyCovered += Number(d.installment_amount)
           }
         }
