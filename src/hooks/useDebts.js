@@ -89,6 +89,18 @@ export function useDebts() {
     await refetch()
   }
 
+  // Cierra la deuda como pagada dejando el valor ya abonado (paid_amount) tal cual,
+  // sin forzarlo a coincidir con el total (útil si se negoció/saldó por menos).
+  const finalize = async (id) => {
+    const debt = debts.find((d) => d.id === id)
+    if (!debt) return
+    await update(id, {
+      paid_installments: Number(debt.total_installments),
+      status: 'paid',
+      last_payment_month: null,
+    })
+  }
+
   const remove = async (id) => {
     const { error } = await supabase.from('debts').delete().eq('id', id)
     if (error) throw error
@@ -114,5 +126,5 @@ export function useDebts() {
     )
   totals.pending = totals.total - totals.paid
 
-  return { debts, loading, add, update, payInstallments, toggleMonthlyPayment, resetMonth, remove, totals }
+  return { debts, loading, add, update, payInstallments, toggleMonthlyPayment, resetMonth, finalize, remove, totals }
 }

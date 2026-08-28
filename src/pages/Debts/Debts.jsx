@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, CreditCard, CheckCircle, Check, Layers, Pencil, ChevronDown, History } from 'lucide-react'
+import { Plus, Trash2, CreditCard, CheckCircle, Check, Layers, Pencil, ChevronDown, History, Flag } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -323,7 +323,7 @@ function PayModal({ debt, onConfirm, onClose }) {
 }
 
 export default function Debts() {
-  const { debts, loading, add, update, payInstallments, toggleMonthlyPayment, remove, totals } = useDebts()
+  const { debts, loading, add, update, payInstallments, toggleMonthlyPayment, finalize, remove, totals } = useDebts()
   const [addOpen, setAddOpen] = useState(false)
   const [payDebt, setPayDebt] = useState(null)
   const [editDebt, setEditDebt] = useState(null)
@@ -490,14 +490,25 @@ export default function Debts() {
                   {d.notes && (
                     <p className="text-txt-muted text-xs mt-1 italic">{d.notes}</p>
                   )}
-                  <button
-                    onClick={() => setPayDebt(d)}
-                    disabled={remaining === 0}
-                    className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5 mt-3 w-full sm:w-auto justify-center"
-                  >
-                    <Layers size={12} />
-                    Pagar cuota
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                    <button
+                      onClick={() => setPayDebt(d)}
+                      disabled={remaining === 0}
+                      className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5 justify-center"
+                    >
+                      <Layers size={12} />
+                      Pagar cuota
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`¿Finalizar "${d.name}"? Quedará marcada como pagada con lo que llevas abonado (${formatCurrency(d.paid_amount)}), aunque falten cuotas.`)) finalize(d.id)
+                      }}
+                      className="btn-secondary text-xs py-1.5 px-4 flex items-center gap-1.5 justify-center"
+                    >
+                      <Flag size={12} />
+                      Finalizar deuda
+                    </button>
+                  </div>
                 </div>
 
                 {/* Progress */}
