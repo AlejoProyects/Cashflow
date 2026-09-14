@@ -13,6 +13,7 @@ import Budgets from './pages/Budgets/Budgets'
 import Goals from './pages/Goals/Goals'
 import Categories from './pages/Categories/Categories'
 import Profile from './pages/Profile/Profile'
+import Admin from './pages/Admin/Admin'
 import ForgotPassword from './pages/Auth/ForgotPassword'
 import ResetPassword from './pages/Auth/ResetPassword'
 
@@ -40,6 +41,7 @@ export default function App() {
                     <Route path="/goals" element={<Goals />} />
                     <Route path="/categories" element={<Categories />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/admin" element={<Admin />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </Layout>

@@ -18,6 +18,9 @@ export const formatDate = (date) =>
 export const formatDateShort = (date) =>
   date ? format(parseISO(date), 'dd/MM/yy') : '—'
 
+export const formatDateTime = (date) =>
+  date ? format(parseISO(date), "dd MMM yyyy, HH:mm", { locale: es }) : 'Nunca'
+
 export const daysUntil = (date) => {
   if (!date) return null
   const diff = Math.ceil((new Date(date) - new Date()) / (1000 * 60 * 60 * 24))

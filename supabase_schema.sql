@@ -163,3 +163,96 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- SUPERADMIN: panel de administración (lectura de todos los usuarios)
+-- ============================================================
+
+-- 1. Guardar el email en profiles (no existe hoy) para poder listar usuarios
+--    sin depender de auth.users, que el cliente no puede consultar directamente.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email text;
+
+UPDATE public.profiles p
+SET email = u.email
+FROM auth.users u
+WHERE p.id = u.id AND p.email IS NULL;
+
+-- 2. A partir de ahora, guardar el email también al crear el perfil.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, email)
+  VALUES (NEW.id, NEW.raw_user_meta_data->>'full_name', NEW.email);
+  RETURN NEW;
+END;
+$$;
+
+-- 3. Políticas RLS adicionales (SOLO LECTURA) para el superadmin.
+--    Son aditivas: las políticas "*_owner" existentes se mantienen intactas,
+--    así que cada usuario sigue viendo y editando solo lo suyo.
+--    Cambia el correo si en algún momento cambias de cuenta admin.
+CREATE POLICY "admin_read_all_profiles" ON public.profiles
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+CREATE POLICY "admin_read_all_categories" ON public.categories
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+CREATE POLICY "admin_read_all_transactions" ON public.transactions
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+CREATE POLICY "admin_read_all_debts" ON public.debts
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+CREATE POLICY "admin_read_all_fixed_payments" ON public.fixed_payments
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+CREATE POLICY "admin_read_all_budgets" ON public.budgets
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+CREATE POLICY "admin_read_all_savings_goals" ON public.savings_goals
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+CREATE POLICY "admin_read_all_planned_expenses" ON public.planned_expenses
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'alejo.0514.1998@gmail.com');
+
+-- 4. Función de solo-admin que expone last_sign_in_at (de auth.users, no
+--    accesible directamente vía API) junto con los datos de profiles.
+--    Usamos una función SECURITY DEFINER en vez de una vista: el linter de
+--    Supabase marca como error cualquier vista sobre auth.users expuesta a
+--    anon/authenticated, mientras que una función puede validar el email del
+--    llamador ANTES de tocar auth.users y devolver un error si no coincide.
+--    search_path fijo evita hijacking de search_path; el EXECUTE se revoca
+--    de "anon" explícitamente porque Supabase lo otorga por defecto.
+CREATE OR REPLACE FUNCTION public.admin_list_users()
+RETURNS TABLE (
+  id uuid,
+  full_name text,
+  email text,
+  currency text,
+  created_at timestamptz,
+  last_sign_in_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+BEGIN
+  IF auth.jwt() ->> 'email' IS DISTINCT FROM 'alejo.0514.1998@gmail.com' THEN
+    RAISE EXCEPTION 'not authorized';
+  END IF;
+
+  RETURN QUERY
+  SELECT p.id, p.full_name, p.email, p.currency, p.created_at, u.last_sign_in_at
+  FROM public.profiles p
+  JOIN auth.users u ON u.id = p.id
+  ORDER BY p.created_at ASC;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.admin_list_users() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_list_users() FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_list_users() TO authenticated;

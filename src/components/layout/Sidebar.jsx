@@ -1,8 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, ArrowLeftRight, CreditCard, Calendar, PieChart, Target, Tags, LogOut, Wallet
+  LayoutDashboard, ArrowLeftRight, CreditCard, Calendar, PieChart, Target, Tags, LogOut, Wallet, ShieldCheck
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { isSuperAdmin } from '../../utils/admin'
 
 const links = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,6 +18,9 @@ const links = [
 export default function Sidebar() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const navLinks = isSuperAdmin(user)
+    ? [...links, { to: '/admin', icon: ShieldCheck, label: 'Admin' }]
+    : links
 
   return (
     <aside className="hidden md:flex flex-col w-60 bg-bg-surface border-r border-white/5 h-screen sticky top-0 shrink-0">
@@ -33,7 +37,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {links.map(({ to, icon: Icon, label }) => (
+        {navLinks.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

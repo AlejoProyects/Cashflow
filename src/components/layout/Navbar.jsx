@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ArrowLeftRight, CreditCard, Calendar, PieChart,
-  Target, Tags, User, LogOut, Wallet, MoreHorizontal, X,
+  Target, Tags, User, LogOut, Wallet, MoreHorizontal, X, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { isSuperAdmin } from '../../utils/admin'
 
 const primaryLinks = [
   { to: '/',                icon: LayoutDashboard, label: 'Inicio' },
@@ -26,6 +27,9 @@ export default function Navbar() {
   const navigate = useNavigate()
 
   const avatar = (user?.user_metadata?.full_name ?? user?.email ?? '?')[0].toUpperCase()
+  const drawerLinks = isSuperAdmin(user)
+    ? [...secondaryLinks, { to: '/admin', icon: ShieldCheck, label: 'Admin' }]
+    : secondaryLinks
 
   const handleSecondaryNav = (to) => {
     setDrawerOpen(false)
@@ -108,7 +112,7 @@ export default function Navbar() {
               </button>
             </div>
             <div className="px-3 pb-6 space-y-0.5">
-              {secondaryLinks.map(({ to, icon: Icon, label }) => (
+              {drawerLinks.map(({ to, icon: Icon, label }) => (
                 <button
                   key={to}
                   onClick={() => handleSecondaryNav(to)}
