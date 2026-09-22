@@ -89,13 +89,15 @@ export function useDebts() {
     await refetch()
   }
 
-  // Cierra la deuda como pagada dejando el valor ya abonado (paid_amount) tal cual,
-  // sin forzarlo a coincidir con el total (útil si se negoció/saldó por menos).
+  // Cierra la deuda como pagada, ajustando el total a lo realmente abonado
+  // (útil si se negoció/saldó por menos): total_amount pasa a igualar
+  // paid_amount, así no queda un pendiente fantasma en el histórico.
   const finalize = async (id) => {
     const debt = debts.find((d) => d.id === id)
     if (!debt) return
     await update(id, {
       paid_installments: Number(debt.total_installments),
+      total_amount: Number(debt.paid_amount),
       status: 'paid',
       last_payment_month: null,
     })
