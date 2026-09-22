@@ -91,12 +91,13 @@ export function useDebts() {
 
   // Cierra la deuda como pagada, ajustando el total a lo realmente abonado
   // (útil si se negoció/saldó por menos): total_amount pasa a igualar
-  // paid_amount, así no queda un pendiente fantasma en el histórico.
+  // paid_amount y total_installments a igualar paid_installments, así queda
+  // el número real de cuotas pagadas en vez de forzarlo al total original.
   const finalize = async (id) => {
     const debt = debts.find((d) => d.id === id)
     if (!debt) return
     await update(id, {
-      paid_installments: Number(debt.total_installments),
+      total_installments: Number(debt.paid_installments),
       total_amount: Number(debt.paid_amount),
       status: 'paid',
       last_payment_month: null,
